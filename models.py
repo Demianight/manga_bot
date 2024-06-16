@@ -13,7 +13,7 @@ class User(BaseModel):
 
 
 class Manga(BaseModel):
-    id = BigAutoField()
+    id = CharField()
     title = CharField()
     url = CharField()
 

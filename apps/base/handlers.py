@@ -1,4 +1,4 @@
-from aiogram import Router
+from aiogram import F, Router
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
@@ -17,6 +17,12 @@ async def start(message: Message):
         "Надеюсь, что у нас все получиться!",
         reply_markup=main_kb(),
     )
+
+
+@router.message(F.text == "Помощь")
+async def help(message: Message):
+    await message.answer("Господи, помогите мне, я уже не могу")
+
 
 last_router = Router()
 
