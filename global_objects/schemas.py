@@ -49,3 +49,24 @@ class MangaSchema(BaseModel):
                     'Описание: ' + self.description['ru'] if 'ru' in self.description else self.description.get('en')
                 )
                 return str(self) + (description_text if description_text else 'Неизвестно')
+
+
+class ChapterSchema(BaseModel):
+    id: str
+    title: str
+    chapter: float
+
+    @classmethod
+    def load_from_raw_response(cls, raw: dict[str, Any]):
+        return ChapterSchema(**raw['attributes'], id=raw["id"])
+
+    def __str__(self):
+        return (
+            f'Глава: {int(self.chapter)}\n'
+            f'Название: {self.title}\n'
+        )
+
+    def __format__(self, format_spec: str) -> str:
+        match format_spec:
+            case _:
+                return str(self)
