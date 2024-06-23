@@ -1,8 +1,10 @@
+import os
 from aiogram import F, Router
-from aiogram.filters import CommandStart
+from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
+from env import settings
 from global_objects.reply_keyboard import main_kb
 from models import User
 
@@ -23,6 +25,18 @@ async def start(message: Message):
 async def help(message: Message):
     await message.answer("Господи, помогите мне, я уже не могу")
 
+
+@router.message(Command('stats'))
+async def stats(message: Message, state: FSMContext):
+    if message.from_user.id not in settings.admin_ids:
+        return await random_message(message, state)
+
+    users_count = User.select().count()
+    chapters_count = len(os.listdir(settings.base_dir / 'pdfs'))
+    await message.answer(
+        f"Всего пользователей: {users_count}\n"
+        f"Скачано глав: {chapters_count}\n"
+    )
 
 last_router = Router()
 
