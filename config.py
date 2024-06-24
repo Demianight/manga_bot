@@ -3,8 +3,8 @@ import logging
 
 from aiogram import Bot, Dispatcher
 
+from apps import last_router, main_router
 from env import settings
-from apps import main_router, last_router
 
 
 def start_bot():

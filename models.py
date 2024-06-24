@@ -1,4 +1,5 @@
-from peewee import Model, BigAutoField, CharField,  ForeignKeyField, SqliteDatabase
+from peewee import (BigAutoField, BigIntegerField, CharField, ForeignKeyField,
+                    Model, SqliteDatabase)
 
 database = SqliteDatabase('db.sqlite3')
 
@@ -10,6 +11,7 @@ class BaseModel(Model):
 
 class User(BaseModel):
     id = BigAutoField()
+    tg_id = BigIntegerField()
 
 
 class Manga(BaseModel):

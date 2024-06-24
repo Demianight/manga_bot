@@ -1,1 +1,1 @@
-from . handlers import router as router
+from .handlers import router as router

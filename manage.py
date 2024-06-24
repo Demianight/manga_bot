@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from config import start_bot
 
 
@@ -35,8 +36,6 @@ def main(args: list[str]):
     try:
         commands[args[0]](*args[1:])
     except KeyError:
-        print("Unknown command")
-        print("Unknown command")
         print("Unknown command")
 
 

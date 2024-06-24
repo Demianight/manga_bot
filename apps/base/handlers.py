@@ -1,10 +1,13 @@
 import os
+
 from aiogram import F, Router
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from env import settings
+from global_objects.inline_keyboard import delete_message_kb
+from global_objects.messages import HELP_MESSAGE
 from global_objects.reply_keyboard import main_kb
 from models import User
 
@@ -13,7 +16,7 @@ router = Router()
 
 @router.message(CommandStart())
 async def start(message: Message):
-    User.get_or_create(id=message.from_user.id)
+    User.get_or_create(tg_id=message.from_user.id)
     await message.answer(
         "Привет!\n\nЯ бот который поможет вам скачивать и читать мангу в удобном для вас формате!\n\n"
         "Надеюсь, что у нас все получиться!",
@@ -23,7 +26,7 @@ async def start(message: Message):
 
 @router.message(F.text == "Помощь")
 async def help(message: Message):
-    await message.answer("Господи, помогите мне, я уже не могу")
+    await message.answer(HELP_MESSAGE, reply_markup=delete_message_kb())
 
 
 @router.message(Command('stats'))

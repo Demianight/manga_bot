@@ -1,9 +1,13 @@
 import asyncio
 from io import BytesIO
-from PIL import Image
+from pathlib import Path
+
 from httpx import AsyncClient
+from PIL import Image
 
 from apps.errors.exceptions import RequestException
+from env import settings
+
 from .schemas import ChapterSchema, MangaSchema
 
 
@@ -63,26 +67,44 @@ class MangaService:
             except KeyError:
                 raise RequestException(response.text)
 
-    def save_images_to_pdf(self, images: list[Image.Image], file_name: str):
+    async def get_chapter_by_number(self, manga_id: str, chapter_num: int) -> ChapterSchema | None:
+        async with self.client as client:
+            response = await client.get(
+                "/chapter",
+                params={
+                    "manga": manga_id,
+                    "translatedLanguage[]": ["ru"],
+                    "chapter": chapter_num
+                },
+            )
+            try:
+                data = response.json()["data"]
+                return ChapterSchema.load_from_raw_response(data[0])
+            except KeyError:
+                raise RequestException(response.text)
+            except IndexError:
+                return None
+
+    def _save_images_to_pdf(self, images: list[Image.Image], file_name: Path):
         if images:
             images[0].save(file_name, save_all=True, append_images=images[1:])
         return file_name
 
-    async def get_images_from_urls(self, urls: list[str], hash: str) -> list[Image.Image]:
+    async def _get_images_from_urls(self, urls: list[str], hash: str) -> list[Image.Image]:
         async with self.image_downloader as client:
             tasks = [client.get(f'{hash}/{url}') for url in urls]
             responses = await asyncio.gather(*tasks)
             images = [Image.open(BytesIO(response.content)) for response in responses]
             return images
 
-    async def download_chapter(self, chapter_id: str):
+    async def download_chapter(self, chapter_id: str) -> Path:
         async with self.downloader as client:
             response = await client.get(f"/{chapter_id}")
             try:
                 data = response.json()["chapter"]
                 urls = data['data']
-                images = await self.get_images_from_urls(urls, data['hash'])
-                return self.save_images_to_pdf(images, f'pdfs/{chapter_id}.pdf')
+                images = await self._get_images_from_urls(urls, data['hash'])
+                return self._save_images_to_pdf(images, settings.base_dir / f'pdfs/{chapter_id}.pdf')
             except KeyError:
                 raise RequestException(response.text)
 

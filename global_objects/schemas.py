@@ -1,9 +1,10 @@
 from enum import StrEnum
 from typing import Any
+
 from pydantic import BaseModel, field_validator
 
 
-class FormatSpecs(StrEnum):
+class FormatOptions(StrEnum):
     SIMPLE = 'simple'
     DETAILED = 'detailed'
 
@@ -33,18 +34,19 @@ class MangaSchema(BaseModel):
 
     def __str__(self):
         title_text = self.altTitles['ru'] if 'ru' in self.altTitles else self.altTitles.get('en')
+        chapters_text = f"{self.lastChapter} (фактическое число может отличаться)" if self.lastChapter else "Неизвестно"
         return (
             f'Название: {title_text}\n'
             f'Статус: {self.status}\n'
             f'Год написания: {self.year}\n'
-            f'Последняя глава: {self.lastChapter if self.lastChapter else "Неизвестно"}\n'
+            f'Последняя глава: {chapters_text}\n'
         ).replace('None', 'Неизвестно')
 
-    def __format__(self, format_spec: FormatSpecs) -> str:
+    def __format__(self, format_spec: FormatOptions) -> str:
         match format_spec:
-            case FormatSpecs.SIMPLE:
+            case FormatOptions.SIMPLE:
                 return str(self)
-            case FormatSpecs.DETAILED:
+            case FormatOptions.DETAILED:
                 description_text = (
                     'Описание: ' + self.description['ru'] if 'ru' in self.description else self.description.get('en')
                 )
@@ -54,7 +56,11 @@ class MangaSchema(BaseModel):
 class ChapterSchema(BaseModel):
     id: str
     title: str
-    chapter: float
+    chapter: float | int
+
+    @field_validator('chapter')
+    def normalize_chapter(cls, chapter: float):
+        return int(chapter)
 
     @classmethod
     def load_from_raw_response(cls, raw: dict[str, Any]):

@@ -1,12 +1,13 @@
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
-from apps.manga_search.inline_keyboard import choose_chapter_kb, manga_navigate_kb
+
+from apps.manga_search.inline_keyboard import (chapter_detailed_kb,
+                                               manga_navigate_kb)
 from apps.manga_search.states import MangaSearchStates
-from apps.manga_search.utils import get_chapters_message
 from global_objects import manga_service
 from global_objects.schemas import MangaSchema
-from global_objects.utils import get_state_data
+from global_objects.utils import delete_message, get_state_data
 
 router = Router()
 
@@ -36,11 +37,11 @@ async def manga_navigate(
 ):
     if not message.text.isdigit():
         return
-    await core_message.delete()
-    page = int(message.text) // 5
-    chapters = await manga_service.get_chapters(current_manga.id, page * 5)
-    mes = await message.answer(
-        get_chapters_message(chapters),
-        reply_markup=choose_chapter_kb(chapters, page),
-    )
-    await state.update_data(page=page, chapters=chapters, core_message=mes)
+    current_chapter = await manga_service.get_chapter_by_number(current_manga.id, int(message.text))
+    if not current_chapter:
+        return await delete_message(await message.answer('Глава не найдена'), 5)
+
+    await delete_message(core_message)
+
+    mes = await message.answer(str(current_chapter), reply_markup=chapter_detailed_kb())
+    await state.update_data(current_chapter=current_chapter, core_message=mes)
