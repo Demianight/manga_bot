@@ -4,6 +4,12 @@ from typing import Any
 from pydantic import BaseModel, field_validator
 
 
+class ChapterActions(StrEnum):
+    SOLO = 'solo'
+    RANGE = 'range'
+    LIST = 'list'
+
+
 class FormatOptions(StrEnum):
     SIMPLE = 'simple'
     DETAILED = 'detailed'

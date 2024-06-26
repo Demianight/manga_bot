@@ -80,7 +80,7 @@ async def download_chapter(callback: CallbackQuery, state: FSMContext, current_c
     file_path = await manga_service.download_chapter(current_chapter.id)
     await delete_message(mes, 1)
     mes = await callback.message.answer('Обрабатываю...')
-    input_file = FSInputFile(file_path, f'{current_chapter.title}.pdf')
+    input_file = FSInputFile(file_path, f'{current_chapter.chapter}. {current_chapter.title}.pdf')
     await delete_message(mes, 1)
     mes = await callback.message.answer('Отправляю...')
     await callback.message.answer_document(input_file)
@@ -107,3 +107,27 @@ async def prev_chapters(callback: CallbackQuery, state: FSMContext, page: int, c
         get_chapters_message(chapters),
         reply_markup=choose_chapter_kb(chapters, page - 1),
     )
+
+
+@router.callback_query(F.data == 'agree_to_download', get_state_data)
+async def agree_to_download(
+    callback: CallbackQuery,
+    state: FSMContext,
+    chapters: list[ChapterSchema],
+    request_text: str,
+    errors: list[int],
+):
+    await delete_message(callback.message)
+    if errors:
+        await callback.message.answer(
+            f'Не получилось найти главы {", ".join(map(str, errors))}\nИтоговый файл не будет их содержать'
+        )
+    mes = await callback.message.answer('Скачиваю...')
+    file_path = await manga_service.download_chapters([chapter.id for chapter in chapters])
+    await delete_message(mes, 1)
+    mes = await callback.message.answer('Обрабатываю...')
+    input_file = FSInputFile(file_path, f'{request_text}.pdf')
+    await delete_message(mes, 1)
+    mes = await callback.message.answer('Отправляю...')
+    await callback.message.answer_document(input_file)
+    await delete_message(mes, 1)

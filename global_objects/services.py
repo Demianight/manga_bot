@@ -1,6 +1,7 @@
 import asyncio
 from io import BytesIO
 from pathlib import Path
+from typing import Iterable
 
 from httpx import AsyncClient
 from PIL import Image
@@ -107,6 +108,22 @@ class MangaService:
                 return self._save_images_to_pdf(images, settings.base_dir / f'pdfs/{chapter_id}.pdf')
             except KeyError:
                 raise RequestException(response.text)
+
+    async def download_chapters(self, chapter_ids: Iterable[str]) -> Path:
+        tasks = []
+        for chapter_id in chapter_ids:
+            async with self.downloader as client:
+                response = await client.get(f"/{chapter_id}")
+                try:
+                    data = response.json()["chapter"]
+                    urls = data['data']
+                    tasks.append(self._get_images_from_urls(urls, data['hash']))
+                except KeyError:
+                    raise RequestException(response.text)
+
+        image_lists: list[list[Image.Image]] = await asyncio.gather(*tasks)
+        images: list[Image.Image] = [image for image_list in image_lists for image in image_list]
+        return self._save_images_to_pdf(images, settings.base_dir / f'pdfs/{chapter_id}.pdf')
 
 
 manga_service = MangaService()

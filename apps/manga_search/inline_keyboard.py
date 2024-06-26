@@ -51,3 +51,13 @@ def chapter_detailed_kb():
     )
 
     return kb.adjust(1, 2).as_markup(resize_keyboard=True)
+
+
+def agree_kb():
+    kb = InlineKeyboardBuilder()
+    (
+        kb
+        .button(text='Да', callback_data='agree_to_download')
+        .button(text='Нет', callback_data='close_message')
+    )
+    return kb.adjust(2).as_markup(resize_keyboard=True)

@@ -2,11 +2,12 @@ from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
-from apps.manga_search.inline_keyboard import (chapter_detailed_kb,
+from apps.manga_search.inline_keyboard import (agree_kb, chapter_detailed_kb,
                                                manga_navigate_kb)
 from apps.manga_search.states import MangaSearchStates
+from apps.manga_search.utils import define_action, get_action_arguments, get_chapters_by_numbers
 from global_objects import manga_service
-from global_objects.schemas import MangaSchema
+from global_objects.schemas import ChapterActions, MangaSchema
 from global_objects.utils import delete_message, get_state_data
 
 router = Router()
@@ -35,13 +36,34 @@ async def manga_navigate(
     current_manga: MangaSchema,
     core_message: Message
 ):
-    if not message.text.isdigit():
+    action = define_action(message.text)
+    if not action:
         return
-    current_chapter = await manga_service.get_chapter_by_number(current_manga.id, int(message.text))
-    if not current_chapter:
-        return await delete_message(await message.answer('Глава не найдена'), 5)
+    arguments = get_action_arguments(message.text, action)
+    chapters, errors = await get_chapters_by_numbers(current_manga.id, arguments)
+    await state.update_data(
+        action=action,
+        arguments=arguments,
+        chapters=chapters,
+        request_text=message.text,
+        errors=errors
+    )
+    match action:
+        case ChapterActions.SOLO:
+            current_chapter = chapters[0]
+            if not current_chapter:
+                return await delete_message(await message.answer('Глава не найдена'), 5)
+            await delete_message(core_message)
 
-    await delete_message(core_message)
-
-    mes = await message.answer(str(current_chapter), reply_markup=chapter_detailed_kb())
-    await state.update_data(current_chapter=current_chapter, core_message=mes)
+            mes = await message.answer(str(current_chapter), reply_markup=chapter_detailed_kb())
+            await state.update_data(current_chapter=current_chapter, core_message=mes)
+        case ChapterActions.RANGE:
+            await message.answer(
+                f'Вы точно уверены что хотите скачать главы с {arguments[0]} по {arguments[-1]}?',
+                reply_markup=agree_kb(),
+            )
+        case ChapterActions.LIST:
+            await message.answer(
+                f'Вы точно уверены что хотите скачать главы {", ".join(map(str, arguments))}?',
+                reply_markup=agree_kb(),
+            )
