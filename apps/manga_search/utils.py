@@ -1,4 +1,5 @@
-from typing import Iterable, Sequence
+import asyncio
+from typing import Sequence
 
 from global_objects.schemas import ChapterActions, ChapterSchema
 from global_objects import manga_service
@@ -10,15 +11,16 @@ def get_chapters_message(chapters: list[ChapterSchema]):
     return header + chapters_text
 
 
-async def get_chapters_by_numbers(manga_id: str, numbers: Iterable[int]) -> tuple[list[ChapterSchema], list[int]]:
-    errors = []
-    chapters = []
+async def get_chapters_by_numbers(manga_id: str, numbers: Sequence[int]) -> tuple[list[ChapterSchema], list[int]]:
+    tasks = []
     for number in numbers:
-        chapter = await manga_service.get_chapter_by_number(manga_id, number)
-        if not chapter:
+        tasks.append(manga_service.get_chapter_by_number(manga_id, number))
+    chapters = await asyncio.gather(*tasks)
+    errors = []
+    for number, chapter in zip(numbers, chapters):
+        if chapter is None:
             errors.append(number)
-            continue
-        chapters.append(chapter)
+    chapters = [chapter for chapter in chapters if chapter]
     return chapters, errors
 
 
