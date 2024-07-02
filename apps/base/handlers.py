@@ -56,6 +56,12 @@ async def restart(message: Message, state: FSMContext):
     os.system(f"pm2 restart manga -- {message.from_user.id}")
 
 
+@router.message(Command('exit'))
+async def exit_(message: Message, state: FSMContext):
+    await message.answer("Возвращаю на главную", reply_markup=main_kb())
+    await state.clear()
+
+
 last_router = Router()
 
 

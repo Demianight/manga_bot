@@ -1,5 +1,4 @@
 from asyncio import sleep
-from re import M
 
 from aiogram.fsm.context import FSMContext
 from aiogram.methods import Request
