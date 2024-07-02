@@ -1,3 +1,4 @@
+import os
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, FSInputFile
@@ -8,9 +9,11 @@ from apps.manga_search.inline_keyboard import (chapter_detailed_kb,
                                                manga_navigate_kb)
 from apps.manga_search.states import MangaSearchStates
 from apps.manga_search.utils import get_chapters_message
+from env import settings
 from global_objects import manga_service
 from global_objects.schemas import ChapterSchema, MangaSchema
 from global_objects.utils import delete_message, get_state_data
+from global_objects.variables import TO_MB
 
 router = Router()
 
@@ -78,6 +81,13 @@ async def back_to_chapters(
 async def download_chapter(callback: CallbackQuery, state: FSMContext, current_chapter: ChapterSchema):
     mes = await callback.message.answer('Скачиваю...')
     file_path = await manga_service.download_chapter(current_chapter.id)
+    file_size = os.path.getsize(settings.base_dir / 'pdfs' / file_path) / TO_MB
+    if file_size > 50:
+        return await callback.message.answer(
+            'Файл слишком большой!\nРазмер: {:.2f} МБ'
+            'Обратитесь к @komar197 с этой проблемой, может он наконец то, что то придумает'.format(file_size)
+        )
+
     await delete_message(mes, 1)
     mes = await callback.message.answer('Обрабатываю...')
     input_file = FSInputFile(file_path, f'{current_chapter.chapter}. {current_chapter.title}.pdf')
@@ -125,6 +135,12 @@ async def agree_to_download(
     mes = await callback.message.answer('Скачиваю...')
     file_path = await manga_service.download_chapters([chapter.id for chapter in chapters])
     await delete_message(mes, 1)
+    file_size = os.path.getsize(settings.base_dir / 'pdfs' / file_path) / TO_MB
+    if file_size > 50:
+        return await callback.message.answer(
+            'Файл слишком большой!\nРазмер: {:.2f} МБ\n'
+            'Обратитесь к @komar197 с этой проблемой, может он наконец то, что то придумает...'.format(file_size)
+        )
     mes = await callback.message.answer('Обрабатываю...')
     input_file = FSInputFile(file_path, f'{request_text}.pdf')
     await delete_message(mes, 1)

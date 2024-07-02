@@ -1,10 +1,11 @@
+import asyncio
 from pathlib import Path
 
 from config import start_bot
 
 
 def start():
-    start_bot()
+    asyncio.run(start_bot([]))
 
 
 def startapp(app_name: str):

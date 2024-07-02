@@ -11,7 +11,7 @@ router = Router()
 @router.callback_query(F.data == "delete_message")
 async def _delete_message(callback: CallbackQuery, state: FSMContext):
     await callback.message.answer('Возвращаю на главную', reply_markup=main_kb())
-    await delete_message(callback.message, delay=1.5)
+    await delete_message(callback.message)
     await state.clear()
 
 

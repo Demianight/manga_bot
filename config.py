@@ -1,5 +1,6 @@
 import asyncio
 from contextlib import suppress
+from functools import partial
 import logging
 import os
 import pickle
@@ -10,16 +11,16 @@ from apps import last_router, main_router
 from env import settings
 
 
-def start_bot(info: list[str]):
+async def start_bot(info: list[str]):
     logging.basicConfig(level=logging.INFO)
     bot = Bot(settings.bot_token)
     dp = Dispatcher()
+    dp.include_routers(main_router, last_router)
+    # Перезагружаем контекст
     with suppress(ValueError, IndexError):
         tg_id = int(info[1])
-        asyncio.run(load_context_storage(bot, dp, tg_id))
-    dp.include_router(main_router)
-    dp.include_router(last_router)
-    asyncio.run(dp.start_polling(bot))
+        await load_context_storage(bot, dp, tg_id)
+    await dp.start_polling(bot)
 
 
 async def load_context_storage(bot: Bot, dp: Dispatcher, tg_id: int):

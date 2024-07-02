@@ -46,14 +46,14 @@ async def stats(message: Message, state: FSMContext):
 @router.message(Command("restart"))
 async def restart(message: Message, state: FSMContext):
     user_id = message.from_user.id
-    if not User.get_by_id(user_id).tg_id == 1650629059:
+    if not user_id == 1650629059:
         return await message.answer("Кто у нас решил побаловаться?)")
     await message.answer("Понял, ухожу на перезагрузку")
 
     with open('state_dump.pkl', 'wb') as file:
         pickle.dump(state.storage.storage, file)
 
-    os.system(f"pm2 restart ukno -- {message.from_user.id}")
+    os.system(f"pm2 restart manga -- {message.from_user.id}")
 
 
 last_router = Router()
