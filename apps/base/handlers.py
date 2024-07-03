@@ -36,7 +36,7 @@ async def stats(message: Message, state: FSMContext):
         return await random_message(message, state)
 
     users_count = User.select().count()
-    chapters_count = len(os.listdir(settings.base_dir / 'pdfs'))
+    chapters_count = len(os.listdir(settings.pdfs_folder))
     await message.answer(
         f"Всего пользователей: {users_count}\n"
         f"Скачано глав: {chapters_count}\n"

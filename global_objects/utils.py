@@ -27,3 +27,7 @@ async def delete_messages(state: FSMContext):
 async def delete_message(mes: Message, delay: float = 0):
     await sleep(delay)
     await mes.delete()
+
+
+def normalize_title(title: str) -> str:
+    return title.replace('.', '')

@@ -1,129 +1,124 @@
 import asyncio
 from io import BytesIO
+import itertools
 from pathlib import Path
 from typing import Iterable
 
+from aiolimiter import AsyncLimiter
 from httpx import AsyncClient
 from PIL import Image
 
-from apps.errors.exceptions import RequestException
 from env import settings
+from global_objects.utils import normalize_title
 
 from .schemas import ChapterSchema, MangaSchema
 
+from httpx import Response
+
 
 class MangaService:
+    def __init__(
+            self,
+            limiter: AsyncLimiter = AsyncLimiter(5, 1),
+            base_url: str = "https://api.mangadex.org",
+            image_base_url: str = "https://uploads.mangadex.org/data/",
+            limit: int = 5
+    ):
+        self._base_url = base_url
+        self._image_base_url = image_base_url
+        self._client = AsyncClient(base_url=self._base_url, params={"limit": limit})
+        self._downloader = AsyncClient(base_url=f"{self._base_url}/at-home/server/")
+        self._image_downloader = AsyncClient(base_url=self._image_base_url)
+        self._limiter = limiter
 
-    @property
-    def client(self):
-        return AsyncClient(
-            base_url="https://api.mangadex.org",
-            params={"limit": 5}
-        )
+    async def close(self):
+        await self._client.aclose()
+        await self._downloader.aclose()
+        await self._image_downloader.aclose()
 
-    @property
-    def downloader(self):
-        return AsyncClient(
-            base_url="https://api.mangadex.org/at-home/server/",
-        )
+    async def __aenter__(self):
+        return self
 
-    @property
-    def image_downloader(self):
-        return AsyncClient(
-            base_url="https://uploads.mangadex.org/data/",
-        )
+    async def __aexit__(self, exc_type, exc, tb):
+        await self.close()
 
-    async def get_manga_by_id(self, id):
-        async with self.client as client:
-            response = await client.get(f"/manga/{id}")
-            if response.status_code != 200:
-                raise RequestException
-            return response
+    async def get(
+            self,
+            url: str,
+            client: AsyncClient | None = None,
+            limiter: AsyncLimiter | None = None,
+            **kwargs
+    ) -> Response:
+        client = client or self._client
+        limiter = limiter or self._limiter
+        async with limiter:
+            response = await client.get(url, **kwargs)
+        response.raise_for_status()
+        return response
+
+    async def get_manga_by_id(self, manga_id: str) -> dict:
+        response = await self.get(f"/manga/{manga_id}")
+        return response.json()
 
     async def get_manga(self, title: str) -> list[MangaSchema]:
-        async with self.client as client:
-            response = await client.get(
-                "/manga",
-                params={"title": title}
-            )
-            try:
-                data = response.json()["data"]
-                return [MangaSchema.load_from_raw_response(raw) for raw in data]
-            except KeyError:
-                raise RequestException(response.text)
+        response = await self.get("/manga", params={"title": title})
+        data = response.json().get("data", [])
+        return [MangaSchema.load_from_raw_response(raw) for raw in data]
 
     async def get_chapters(self, manga_id: str, offset: int = 0) -> list[ChapterSchema]:
-        async with self.client as client:
-            response = await client.get(
-                "/chapter",
-                params={
-                    "manga": manga_id,
-                    "translatedLanguage[]": ["ru"],
-                    "offset": offset,
-                },
-            )
-            try:
-                data = response.json()["data"]
-                return [ChapterSchema.load_from_raw_response(raw) for raw in data]
-            except KeyError:
-                raise RequestException(response.text)
+        response = await self.get(
+            "/chapter",
+            params={
+                "manga": manga_id,
+                "translatedLanguage[]": ["ru"],
+                "offset": offset,
+            }
+        )
+        data = response.json().get("data", [])
+        return [ChapterSchema.load_from_raw_response(raw) for raw in data]
 
     async def get_chapter_by_number(self, manga_id: str, chapter_num: int) -> ChapterSchema | None:
-        async with self.client as client:
-            response = await client.get(
-                "/chapter",
-                params={
-                    "manga": manga_id,
-                    "translatedLanguage[]": ["ru"],
-                    "chapter": chapter_num
-                },
-            )
-            try:
-                data = response.json()["data"]
-                return ChapterSchema.load_from_raw_response(data[0])
-            except KeyError:
-                raise RequestException(response.text)
-            except IndexError:
-                return None
+        response = await self.get(
+            "/chapter",
+            params={
+                "manga": manga_id,
+                "translatedLanguage[]": ["ru"],
+                "chapter": chapter_num
+            }
+        )
+        data = response.json().get("data", [])
+        if not data:
+            return None
+        return ChapterSchema.load_from_raw_response(data[0])
 
-    def _save_images_to_pdf(self, images: list[Image.Image], file_name: Path):
+    def _save_images_to_pdf(self, images: list[Image.Image], file_name: Path) -> Path:
         if images:
             images[0].save(file_name, save_all=True, append_images=images[1:])
         return file_name
 
     async def _get_images_from_urls(self, urls: list[str], hash: str) -> list[Image.Image]:
-        async with self.image_downloader as client:
-            tasks = [client.get(f'{hash}/{url}') for url in urls]
-            responses = await asyncio.gather(*tasks)
-            images = [Image.open(BytesIO(response.content)) for response in responses]
-            return images
+        tasks = [self.get(f'{hash}/{url}', self._image_downloader) for url in urls]
+        responses = await asyncio.gather(*tasks)
+        images = [Image.open(BytesIO(response.content)) for response in responses]
+        return images
 
-    async def download_chapter(self, chapter_id: str) -> Path:
-        async with self.downloader as client:
-            response = await client.get(f"/{chapter_id}")
-            try:
-                data = response.json()["chapter"]
-                urls = data['data']
-                images = await self._get_images_from_urls(urls, data['hash'])
-                return self._save_images_to_pdf(images, settings.base_dir / f'pdfs/{chapter_id}.pdf')
-            except KeyError:
-                raise RequestException(response.text)
+    async def download_chapter(self, chapter_id: str, title: str) -> Path:
+        title = normalize_title(title) or chapter_id
+
+        response = await self.get(f"/{chapter_id}", client=self._downloader)
+        data = response.json().get("chapter", {})
+        urls = data.get('data', [])
+        images = await self._get_images_from_urls(urls, data.get('hash', ''))
+        print(settings.pdfs_folder / f'{title}.pdf')
+        return self._save_images_to_pdf(images, settings.pdfs_folder / f'{title}.pdf')
 
     async def download_chapters(self, chapter_ids: Iterable[str]) -> Path:
+        images = []
         tasks = []
         for chapter_id in chapter_ids:
-            async with self.downloader as client:
-                response = await client.get(f"/{chapter_id}")
-                try:
-                    data = response.json()["chapter"]
-                    urls = data['data']
-                    tasks.append(self._get_images_from_urls(urls, data['hash']))
-                except KeyError:
-                    raise RequestException(response.text)
-
-        image_lists: list[list[Image.Image]] = await asyncio.gather(*tasks)
-        images: list[Image.Image] = [image for image_list in image_lists for image in image_list]
-        return self._save_images_to_pdf(images, settings.base_dir / f'pdfs/{chapter_id}.pdf')
-
-
-manga_service = MangaService()
+            response = await self.get(f"/{chapter_id}", client=self._downloader)
+            data = response.json().get("chapter", {})
+            urls = data.get('data', [])
+            tasks.append(self._get_images_from_urls(urls, data.get('hash', '')))
+        images = list(itertools.chain.from_iterable(await asyncio.gather(*tasks)))
+        return self._save_images_to_pdf(images, settings.pdfs_folder / f'{','.join(chapter_ids)}.pdf')

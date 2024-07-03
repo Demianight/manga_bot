@@ -6,7 +6,7 @@ from apps.manga_search.inline_keyboard import (agree_kb, chapter_detailed_kb,
                                                manga_navigate_kb)
 from apps.manga_search.states import MangaSearchStates
 from apps.manga_search.utils import define_action, get_action_arguments, get_chapters_by_numbers
-from global_objects import manga_service
+from global_objects import MangaService
 from global_objects.schemas import ChapterActions, MangaSchema
 from global_objects.utils import delete_message, get_state_data
 
@@ -21,7 +21,8 @@ async def manga_search(message: Message, state: FSMContext):
 
 @router.message(MangaSearchStates.name)
 async def answer_manga(message: Message, state: FSMContext):
-    mangas = await manga_service.get_manga(message.text)
+    async with MangaService() as client:
+        mangas = await client.get_manga(message.text)
     await state.update_data(mangas=mangas)
     await message.answer(
         'Найденные тайтлы:\n\n' + '\n'.join([f'{i}. ' + str(manga) for i, manga in enumerate(mangas, start=1)]),

@@ -1,8 +1,11 @@
 import asyncio
+import os
+from pathlib import Path
 from typing import Sequence
 
 from global_objects.schemas import ChapterActions, ChapterSchema
-from global_objects import manga_service
+from global_objects import MangaService
+from global_objects.variables import TO_MB
 
 
 def get_chapters_message(chapters: list[ChapterSchema]):
@@ -13,9 +16,10 @@ def get_chapters_message(chapters: list[ChapterSchema]):
 
 async def get_chapters_by_numbers(manga_id: str, numbers: Sequence[int]) -> tuple[list[ChapterSchema], list[int]]:
     tasks = []
-    for number in numbers:
-        tasks.append(manga_service.get_chapter_by_number(manga_id, number))
-    chapters = await asyncio.gather(*tasks)
+    async with MangaService() as manga_service:
+        for number in numbers:
+            tasks.append(manga_service.get_chapter_by_number(manga_id, number))
+        chapters = await asyncio.gather(*tasks)
     errors = []
     for number, chapter in zip(numbers, chapters):
         if chapter is None:
@@ -44,3 +48,7 @@ def get_action_arguments(text: str, action: ChapterActions) -> Sequence[int]:
             return range(int(start), int(end) + 1)
         case ChapterActions.LIST:
             return list(map(int, text.split(',')))
+
+
+def get_file_size_in_mb(file_path: str | Path) -> float:
+    return os.path.getsize(file_path) / TO_MB

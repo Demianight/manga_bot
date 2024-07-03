@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     # db: DBSettings
     bot_token: str
     debug: bool
+    server_url: str
+    pdfs_folder: Path
     admin_ids: list[int]
     base_dir: Path = Path(__file__).resolve().parent
 

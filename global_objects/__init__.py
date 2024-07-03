@@ -1,1 +1,1 @@
-from .services import manga_service
+from .services import MangaService

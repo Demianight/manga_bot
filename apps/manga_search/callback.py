@@ -8,12 +8,11 @@ from apps.manga_search.inline_keyboard import (chapter_detailed_kb,
                                                detailed_manga_kb,
                                                manga_navigate_kb)
 from apps.manga_search.states import MangaSearchStates
-from apps.manga_search.utils import get_chapters_message
+from apps.manga_search.utils import get_chapters_message, get_file_size_in_mb
 from env import settings
-from global_objects import manga_service
+from global_objects import MangaService
 from global_objects.schemas import ChapterSchema, MangaSchema
 from global_objects.utils import delete_message, get_state_data
-from global_objects.variables import TO_MB
 
 router = Router()
 
@@ -41,7 +40,8 @@ async def back_to_manga_search(
 async def chapter_navigate(
     callback: CallbackQuery, state: FSMContext, current_manga: MangaSchema
 ):
-    chapters = await manga_service.get_chapters(current_manga.id)
+    async with MangaService() as client:
+        chapters = await client.get_chapters(current_manga.id)
     if not chapters:
         return await delete_message(
             await callback.message.answer(
@@ -70,19 +70,46 @@ async def chapter_detailed(callback: CallbackQuery, state: FSMContext, chapters:
 async def back_to_chapters(
     callback: CallbackQuery, state: FSMContext, chapters: list[ChapterSchema], page: int, current_manga: MangaSchema
 ):
-    chapters = await manga_service.get_chapters(current_manga.id, page * 5)
+    async with MangaService() as client:
+        chapters = await client.get_chapters(current_manga.id, page * 5)
     await callback.message.edit_text(
         get_chapters_message(chapters),
         reply_markup=choose_chapter_kb(chapters, page),
     )
 
 
+@router.callback_query(F.data == 'next_chapters', get_state_data)
+async def next_chapters(callback: CallbackQuery, state: FSMContext, page: int, current_manga: MangaSchema):
+    async with MangaService() as client:
+        chapters = await client.get_chapters(current_manga.id, (page + 1) * 5)
+    await state.update_data(page=page + 1, chapters=chapters)
+    await callback.message.edit_text(
+        get_chapters_message(chapters),
+        reply_markup=choose_chapter_kb(chapters, page + 1),
+    )
+
+
+@router.callback_query(F.data == 'prev_chapters', get_state_data)
+async def prev_chapters(callback: CallbackQuery, state: FSMContext, page: int, current_manga: MangaSchema):
+    if page == 0:
+        return await callback.answer('Это первая страница')
+    async with MangaService() as client:
+        chapters = await client.get_chapters(current_manga.id, (page - 1) * 5)
+    await state.update_data(page=page - 1, chapters=chapters)
+    await callback.message.edit_text(
+        get_chapters_message(chapters),
+        reply_markup=choose_chapter_kb(chapters, page - 1),
+    )
+
+
 @router.callback_query(F.data == 'download_chapter', get_state_data)
-async def download_chapter(callback: CallbackQuery, state: FSMContext, current_chapter: ChapterSchema):
-    mes = await callback.message.answer('Скачиваю...')
-    file_path = await manga_service.download_chapter(current_chapter.id)
-    file_size = os.path.getsize(settings.base_dir / 'pdfs' / file_path) / TO_MB
+async def download_chapter(callback: CallbackQuery, current_chapter: ChapterSchema):
+    mes = await callback.message.answer('Скачиваю... Это может занять не мало времени...')
+    async with MangaService() as client:
+        file_path = await client.download_chapter(current_chapter.id, current_chapter.title)
+    file_size = get_file_size_in_mb(file_path)
     if file_size > 50:
+        print(settings.server_url, file_path)
         return await callback.message.answer(
             'Файл слишком большой!\nРазмер: {:.2f} МБ'
             'Обратитесь к @komar197 с этой проблемой, может он наконец то, что то придумает'.format(file_size)
@@ -95,28 +122,6 @@ async def download_chapter(callback: CallbackQuery, state: FSMContext, current_c
     mes = await callback.message.answer('Отправляю...')
     await callback.message.answer_document(input_file)
     await delete_message(mes, 1)
-
-
-@router.callback_query(F.data == 'next_chapters', get_state_data)
-async def next_chapters(callback: CallbackQuery, state: FSMContext, page: int, current_manga: MangaSchema):
-    chapters = await manga_service.get_chapters(current_manga.id, (page + 1) * 5)
-    await state.update_data(page=page + 1, chapters=chapters)
-    await callback.message.edit_text(
-        get_chapters_message(chapters),
-        reply_markup=choose_chapter_kb(chapters, page + 1),
-    )
-
-
-@router.callback_query(F.data == 'prev_chapters', get_state_data)
-async def prev_chapters(callback: CallbackQuery, state: FSMContext, page: int, current_manga: MangaSchema):
-    if page == 0:
-        return await callback.answer('Это первая страница')
-    chapters = await manga_service.get_chapters(current_manga.id, (page - 1) * 5)
-    await state.update_data(page=page - 1, chapters=chapters)
-    await callback.message.edit_text(
-        get_chapters_message(chapters),
-        reply_markup=choose_chapter_kb(chapters, page - 1),
-    )
 
 
 @router.callback_query(F.data == 'agree_to_download', get_state_data)
@@ -132,10 +137,11 @@ async def agree_to_download(
         await callback.message.answer(
             f'Не получилось найти главы {", ".join(map(str, errors))}\nИтоговый файл не будет их содержать'
         )
-    mes = await callback.message.answer('Скачиваю...')
-    file_path = await manga_service.download_chapters([chapter.id for chapter in chapters])
+    mes = await callback.message.answer('Скачиваю... Это может занять не мало времени...')
+    async with MangaService() as client:
+        file_path = await client.download_chapters([chapter.id for chapter in chapters])
     await delete_message(mes, 1)
-    file_size = os.path.getsize(settings.base_dir / 'pdfs' / file_path) / TO_MB
+    file_size = get_file_size_in_mb(file_path)
     if file_size > 50:
         return await callback.message.answer(
             'Файл слишком большой!\nРазмер: {:.2f} МБ\n'
