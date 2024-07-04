@@ -22,9 +22,9 @@ async def start_bot(info: list[str]):
 
 
 async def load_context_storage(bot: Bot, dp: Dispatcher, tg_id: int):
-    with open('state_dump.pkl', 'rb') as file:
-        dp.storage.storage = pickle.load(file)
-
-    os.remove('state_dump.pkl')
+    if os.path.exists('state_dump.pkl'):
+        with open('state_dump.pkl', 'rb') as file:
+            dp.storage.storage = pickle.load(file)
+        os.remove('state_dump.pkl')
     await bot.send_message(chat_id=tg_id,
                            text="Бот успешно перезагружен!")
