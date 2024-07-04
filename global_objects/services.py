@@ -103,17 +103,16 @@ class MangaService:
         images = [Image.open(BytesIO(response.content)) for response in responses]
         return images
 
-    async def download_chapter(self, chapter_id: str, title: str) -> Path:
-        title = normalize_title(title) or chapter_id
+    async def download_chapter(self, chapter_id: str, file_name: str) -> Path:
+        file_name = normalize_title(file_name) or chapter_id
 
         response = await self.get(f"/{chapter_id}", client=self._downloader)
         data = response.json().get("chapter", {})
         urls = data.get('data', [])
         images = await self._get_images_from_urls(urls, data.get('hash', ''))
-        print(settings.pdfs_folder / f'{title}.pdf')
-        return self._save_images_to_pdf(images, settings.pdfs_folder / f'{title}.pdf')
+        return self._save_images_to_pdf(images, settings.pdfs_folder / f'{file_name}.pdf')
 
-    async def download_chapters(self, chapter_ids: Iterable[str]) -> Path:
+    async def download_chapters(self, chapter_ids: Iterable[str], file_name: str) -> Path:
         images = []
         tasks = []
         for chapter_id in chapter_ids:
@@ -122,4 +121,4 @@ class MangaService:
             urls = data.get('data', [])
             tasks.append(self._get_images_from_urls(urls, data.get('hash', '')))
         images = list(itertools.chain.from_iterable(await asyncio.gather(*tasks)))
-        return self._save_images_to_pdf(images, settings.pdfs_folder / f'{','.join(chapter_ids)}.pdf')
+        return self._save_images_to_pdf(images, settings.pdfs_folder / f'{file_name}.pdf')

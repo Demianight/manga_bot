@@ -139,7 +139,7 @@ async def agree_to_download(
         )
     mes = await callback.message.answer('Скачиваю... Это может занять не мало времени...')
     async with MangaService() as client:
-        file_path = await client.download_chapters([chapter.id for chapter in chapters])
+        file_path = await client.download_chapters([chapter.id for chapter in chapters], request_text)
     await delete_message(mes, 1)
     file_size = get_file_size_in_mb(file_path)
     if file_size > 50:
