@@ -1,14 +1,13 @@
-import os
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, FSInputFile
 
 from apps.manga_search.inline_keyboard import (chapter_detailed_kb,
                                                choose_chapter_kb,
-                                               detailed_manga_kb,
+                                               detailed_manga_kb, download_from_server_kb,
                                                manga_navigate_kb)
 from apps.manga_search.states import MangaSearchStates
-from apps.manga_search.utils import get_chapters_message, get_file_size_in_mb
+from apps.manga_search.utils import create_size_limit_message, get_chapters_message, get_file_size_in_mb
 from env import settings
 from global_objects import MangaService
 from global_objects.schemas import ChapterSchema, MangaSchema
@@ -109,10 +108,12 @@ async def download_chapter(callback: CallbackQuery, current_chapter: ChapterSche
         file_path = await client.download_chapter(current_chapter.id, current_chapter.title)
     file_size = get_file_size_in_mb(file_path)
     if file_size > 50:
-        print(settings.server_url, file_path)
+        file_url = settings.server_url + str(file_path).split("/")[-1]
         return await callback.message.answer(
-            'Файл слишком большой!\nРазмер: {:.2f} МБ'
-            'Обратитесь к @komar197 с этой проблемой, может он наконец то, что то придумает'.format(file_size)
+            create_size_limit_message(
+                file_size
+            ),
+            reply_markup=download_from_server_kb(file_url)
         )
 
     await delete_message(mes, 1)
@@ -127,7 +128,6 @@ async def download_chapter(callback: CallbackQuery, current_chapter: ChapterSche
 @router.callback_query(F.data == 'agree_to_download', get_state_data)
 async def agree_to_download(
     callback: CallbackQuery,
-    state: FSMContext,
     chapters: list[ChapterSchema],
     request_text: str,
     errors: list[int],
@@ -143,9 +143,12 @@ async def agree_to_download(
     await delete_message(mes, 1)
     file_size = get_file_size_in_mb(file_path)
     if file_size > 50:
+        file_url = settings.server_url + str(file_path).split("/")[-1]
         return await callback.message.answer(
-            'Файл слишком большой!\nРазмер: {:.2f} МБ\n'
-            'Обратитесь к @komar197 с этой проблемой, может он наконец то, что то придумает...'.format(file_size)
+            create_size_limit_message(
+                file_size
+            ),
+            reply_markup=download_from_server_kb(file_url)
         )
     mes = await callback.message.answer('Обрабатываю...')
     input_file = FSInputFile(file_path, f'{request_text}.pdf')

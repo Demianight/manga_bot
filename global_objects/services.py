@@ -26,9 +26,10 @@ class MangaService:
     ):
         self._base_url = base_url
         self._image_base_url = image_base_url
-        self._client = AsyncClient(base_url=self._base_url, params={"limit": limit})
-        self._downloader = AsyncClient(base_url=f"{self._base_url}/at-home/server/")
-        self._image_downloader = AsyncClient(base_url=self._image_base_url)
+        self.default_timeout = 30
+        self._client = AsyncClient(base_url=self._base_url, params={"limit": limit}, timeout=self.default_timeout)
+        self._downloader = AsyncClient(base_url=f"{self._base_url}/at-home/server/", timeout=self.default_timeout)
+        self._image_downloader = AsyncClient(base_url=self._image_base_url, timeout=self.default_timeout)
         self._limiter = limiter
 
     async def close(self):

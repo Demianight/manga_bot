@@ -3,9 +3,10 @@ import os
 from pathlib import Path
 from typing import Sequence
 
+from env import settings
 from global_objects.schemas import ChapterActions, ChapterSchema
 from global_objects import MangaService
-from global_objects.variables import TO_MB
+from global_objects.variables import TO_MB, AnyPath
 
 
 def get_chapters_message(chapters: list[ChapterSchema]):
@@ -50,5 +51,9 @@ def get_action_arguments(text: str, action: ChapterActions) -> Sequence[int]:
             return list(map(int, text.split(',')))
 
 
-def get_file_size_in_mb(file_path: str | Path) -> float:
+def get_file_size_in_mb(file_path: AnyPath) -> float:
     return os.path.getsize(file_path) / TO_MB
+
+
+def create_size_limit_message(file_size: float) -> str:
+    return f'Файл слишком большой!\nРазмер: {file_size:.2f} МБ\n'

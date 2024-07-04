@@ -1,6 +1,7 @@
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from global_objects.schemas import ChapterSchema
+from global_objects.variables import AnyPath
 
 
 def manga_navigate_kb(mangas: list):
@@ -61,3 +62,14 @@ def agree_kb():
         .button(text='Нет', callback_data='close_message')
     )
     return kb.adjust(2).as_markup(resize_keyboard=True)
+
+
+def download_from_server_kb(file_url: AnyPath):
+    kb = InlineKeyboardBuilder()
+    (
+        kb
+        .button(text='Скачать', url=str(file_url))
+        .button(text='Эх, ну ладно', callback_data='delete_message')
+    )
+
+    return kb.adjust(1).as_markup(resize_keyboard=True)
