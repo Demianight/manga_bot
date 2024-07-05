@@ -2,7 +2,7 @@ from pathlib import Path
 
 import logging
 
-# Configure logging
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -12,9 +12,9 @@ logging.basicConfig(
     ]
 )
 
-# Get the root logger
 logger = logging.getLogger()
 
+logging.getLogger('httpx').setLevel(logging.WARNING)
 
 TO_MB = 1024 * 1024
 

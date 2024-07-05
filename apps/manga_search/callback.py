@@ -146,6 +146,7 @@ async def agree_to_download(
             [chapter.id for chapter in chapters],
             f'{request_text}_{current_manga.title.get('ru', current_manga.title["en"])}'
         )
+        logger.info(f'File path: {file_path}')
     await delete_message(mes, 1)
     file_size = get_file_size_in_mb(file_path)
     logger.info(
