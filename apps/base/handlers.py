@@ -50,9 +50,6 @@ async def restart(message: Message, state: FSMContext):
         return await message.answer("Кто у нас решил побаловаться?)")
     await message.answer("Понял, ухожу на перезагрузку")
 
-    with open('state_dump.pkl', 'wb') as file:
-        pickle.dump(state.storage.storage, file)
-
     os.system(f"pm2 restart manga -- {message.from_user.id}")
 
 

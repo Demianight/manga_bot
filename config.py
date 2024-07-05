@@ -1,7 +1,4 @@
 from contextlib import suppress
-import logging
-import os
-import pickle
 
 from aiogram import Bot, Dispatcher
 
@@ -16,14 +13,9 @@ async def start_bot(info: list[str]):
     # Перезагружаем контекст
     with suppress(ValueError, IndexError):
         tg_id = int(info[1])
-        await load_context_storage(bot, dp, tg_id)
+        await bot.send_message(
+            chat_id=tg_id,
+            text="Бот успешно перезагружен!"
+        )
+
     await dp.start_polling(bot)
-
-
-async def load_context_storage(bot: Bot, dp: Dispatcher, tg_id: int):
-    if os.path.exists('state_dump.pkl'):
-        with open('state_dump.pkl', 'rb') as file:
-            dp.storage.storage = pickle.load(file)
-        os.remove('state_dump.pkl')
-    await bot.send_message(chat_id=tg_id,
-                           text="Бот успешно перезагружен!")
