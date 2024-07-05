@@ -12,6 +12,8 @@ from env import settings
 from global_objects import MangaService
 from global_objects.schemas import ChapterSchema, MangaSchema
 from global_objects.utils import delete_message, get_state_data
+from global_objects import logger
+
 
 router = Router()
 
@@ -146,8 +148,17 @@ async def agree_to_download(
         )
     await delete_message(mes, 1)
     file_size = get_file_size_in_mb(file_path)
+    logger.info(
+        f'File downloaded: {current_manga.title.get("ru", current_manga.title["en"])}\n'
+        f'Request text: {request_text}\n'
+        f'File path: {file_path}\n'
+        f'File size: {file_size}\n'
+    )
     if file_size > 50:
         file_url = settings.server_url + str(file_path).split("/")[-1]
+        logger.info(
+            f'File url: {file_url}\n'
+        )
         return await callback.message.answer(
             create_size_limit_message(
                 file_size

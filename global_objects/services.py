@@ -1,3 +1,4 @@
+from httpx import AsyncClient, Response, HTTPStatusError, RemoteProtocolError
 import asyncio
 from io import BytesIO
 import itertools
@@ -5,15 +6,15 @@ from pathlib import Path
 from typing import Iterable
 
 from aiolimiter import AsyncLimiter
-from httpx import AsyncClient
 from PIL import Image
 
+from apps.errors.exceptions import RateLimitError
 from env import settings
-from global_objects.utils import normalize_title
+from global_objects.utils import normalize_filename
 
 from .schemas import ChapterSchema, MangaSchema
 
-from httpx import Response
+from .variables import logger
 
 
 class MangaService:
@@ -44,18 +45,40 @@ class MangaService:
         await self.close()
 
     async def get(
-            self,
-            url: str,
-            client: AsyncClient | None = None,
-            limiter: AsyncLimiter | None = None,
-            **kwargs
+        self,
+        url: str,
+        client: AsyncClient | None = None,
+        limiter: AsyncLimiter | None = None,
+        retries: int = 3,
+        delay: float = 1.0,
+        **kwargs
     ) -> Response:
         client = client or self._client
         limiter = limiter or self._limiter
-        async with limiter:
-            response = await client.get(url, **kwargs)
-        response.raise_for_status()
-        return response
+
+        attempt = 0
+        while attempt < retries:
+            async with limiter:
+                try:
+                    response = await client.get(url, **kwargs)
+                    response.raise_for_status()
+                    return response
+                except RemoteProtocolError as e:
+                    logger.error(f"RemoteProtocolError encountered on attempt {attempt + 1}: {e}")
+                except HTTPStatusError as e:
+                    logger.error(f"HTTP error occurred on attempt {attempt + 1}: {e}")
+                    if response.status_code == 403:
+                        raise RateLimitError
+                except Exception as e:
+                    logger.error(f"An unexpected error occurred on attempt {attempt + 1}: {e}")
+
+            attempt += 1
+            if attempt < retries:
+                logger.info(f"Retrying in {delay} seconds...")
+                await asyncio.sleep(delay)
+
+        # If we reach here, all retries have been exhausted
+        raise Exception(f"Failed to fetch {url} after {retries} attempts")
 
     async def get_manga_by_id(self, manga_id: str) -> dict:
         response = await self.get(f"/manga/{manga_id}")
@@ -97,6 +120,11 @@ class MangaService:
             images[0].save(file_name, save_all=True, append_images=images[1:])
         return file_name
 
+    def _validate_file_name(self, file_name: str, default: str = 'no_name') -> Path:
+        file_name = normalize_filename(file_name) or default
+        file_path = settings.pdfs_folder / f'{file_name}.pdf'
+        return file_path
+
     async def _get_images_from_urls(self, urls: list[str], hash: str) -> list[Image.Image]:
         tasks = [self.get(f'{hash}/{url}', self._image_downloader) for url in urls]
         responses = await asyncio.gather(*tasks)
@@ -104,8 +132,7 @@ class MangaService:
         return images
 
     async def download_chapter(self, chapter_id: str, file_name: str) -> Path:
-        file_name = normalize_title(file_name) or chapter_id
-        file_path = settings.pdfs_folder / f'{file_name}.pdf'
+        file_path = self._validate_file_name(file_name, chapter_id)
         if file_path.exists():
             return file_path
 
@@ -116,8 +143,7 @@ class MangaService:
         return self._save_images_to_pdf(images, file_path)
 
     async def download_chapters(self, chapter_ids: Iterable[str], file_name: str) -> Path:
-        file_name = normalize_title(file_name)
-        file_path = settings.pdfs_folder / f'{file_name}.pdf'
+        file_path = self._validate_file_name(file_name)
         if file_path.exists():
             return file_path
 

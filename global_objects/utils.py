@@ -1,4 +1,6 @@
+import os
 from asyncio import sleep
+import re
 
 from aiogram.fsm.context import FSMContext
 from aiogram.methods import Request
@@ -29,5 +31,15 @@ async def delete_message(mes: Message, delay: float = 0):
     await mes.delete()
 
 
-def normalize_title(title: str) -> str:
-    return title.replace('.', '')
+def normalize_filename(filename: str):
+    base, ext = os.path.splitext(filename)
+
+    base = base.replace(" ", "_").replace('.', '')
+    base = re.sub(r'[^\w\-_\.]', '', base)
+
+    max_base_length = 255 - len(ext)
+    base = base[:max_base_length]
+
+    normalized_filename = base + ext
+
+    return normalized_filename

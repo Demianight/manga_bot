@@ -10,7 +10,6 @@ from env import settings
 
 
 async def start_bot(info: list[str]):
-    logging.basicConfig(level=logging.INFO)
     bot = Bot(settings.bot_token)
     dp = Dispatcher()
     dp.include_routers(main_router, last_router)
