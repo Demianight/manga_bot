@@ -105,14 +105,22 @@ class MangaService:
 
     async def download_chapter(self, chapter_id: str, file_name: str) -> Path:
         file_name = normalize_title(file_name) or chapter_id
+        file_path = settings.pdfs_folder / f'{file_name}.pdf'
+        if file_path.exists():
+            return file_path
 
         response = await self.get(f"/{chapter_id}", client=self._downloader)
         data = response.json().get("chapter", {})
         urls = data.get('data', [])
         images = await self._get_images_from_urls(urls, data.get('hash', ''))
-        return self._save_images_to_pdf(images, settings.pdfs_folder / f'{file_name}.pdf')
+        return self._save_images_to_pdf(images, file_path)
 
     async def download_chapters(self, chapter_ids: Iterable[str], file_name: str) -> Path:
+        file_name = normalize_title(file_name)
+        file_path = settings.pdfs_folder / f'{file_name}.pdf'
+        if file_path.exists():
+            return file_path
+
         images = []
         tasks = []
         for chapter_id in chapter_ids:
@@ -121,4 +129,4 @@ class MangaService:
             urls = data.get('data', [])
             tasks.append(self._get_images_from_urls(urls, data.get('hash', '')))
         images = list(itertools.chain.from_iterable(await asyncio.gather(*tasks)))
-        return self._save_images_to_pdf(images, settings.pdfs_folder / f'{file_name}.pdf')
+        return self._save_images_to_pdf(images, file_path)

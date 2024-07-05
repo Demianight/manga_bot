@@ -130,6 +130,7 @@ async def agree_to_download(
     callback: CallbackQuery,
     chapters: list[ChapterSchema],
     request_text: str,
+    current_manga: MangaSchema,
     errors: list[int],
 ):
     await delete_message(callback.message)
@@ -139,7 +140,10 @@ async def agree_to_download(
         )
     mes = await callback.message.answer('Скачиваю... Это может занять не мало времени...')
     async with MangaService() as client:
-        file_path = await client.download_chapters([chapter.id for chapter in chapters], request_text)
+        file_path = await client.download_chapters(
+            [chapter.id for chapter in chapters],
+            f'{request_text}_{current_manga.title.get('ru', current_manga.title["en"])}'
+        )
     await delete_message(mes, 1)
     file_size = get_file_size_in_mb(file_path)
     if file_size > 50:
