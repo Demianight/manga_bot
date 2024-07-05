@@ -116,8 +116,9 @@ class MangaService:
         return ChapterSchema.load_from_raw_response(data[0])
 
     def _save_images_to_pdf(self, images: list[Image.Image], file_name: Path) -> Path:
+        append = file_name.exists()
         if images:
-            images[0].save(file_name, save_all=True, append_images=images[1:])
+            images[0].save(file_name, save_all=True, append_images=images[1:], append=append)
         return file_name
 
     def _validate_file_name(self, file_name: str, default: str = 'no_name') -> Path:
