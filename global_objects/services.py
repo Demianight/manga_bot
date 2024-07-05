@@ -1,7 +1,6 @@
 from httpx import AsyncClient, Response, HTTPStatusError, RemoteProtocolError
 import asyncio
 from io import BytesIO
-import itertools
 from pathlib import Path
 from typing import Iterable
 
@@ -15,6 +14,7 @@ from global_objects.utils import normalize_filename
 from .schemas import ChapterSchema, MangaSchema
 
 from .variables import logger
+from memory_profiler import profile
 
 
 class MangaService:
@@ -131,6 +131,7 @@ class MangaService:
         images = [Image.open(BytesIO(response.content)) for response in responses]
         return images
 
+    @profile
     async def download_chapter(self, chapter_id: str, file_name: str) -> Path:
         file_path = self._validate_file_name(file_name, chapter_id)
         if file_path.exists():
@@ -142,17 +143,16 @@ class MangaService:
         images = await self._get_images_from_urls(urls, data.get('hash', ''))
         return self._save_images_to_pdf(images, file_path)
 
+    @profile
     async def download_chapters(self, chapter_ids: Iterable[str], file_name: str) -> Path:
         file_path = self._validate_file_name(file_name)
         if file_path.exists():
             return file_path
 
-        images = []
-        tasks = []
         for chapter_id in chapter_ids:
             response = await self.get(f"/{chapter_id}", client=self._downloader)
             data = response.json().get("chapter", {})
             urls = data.get('data', [])
-            tasks.append(self._get_images_from_urls(urls, data.get('hash', '')))
-        images = list(itertools.chain.from_iterable(await asyncio.gather(*tasks)))
-        return self._save_images_to_pdf(images, file_path)
+            images = await self._get_images_from_urls(urls, data.get('hash', ''))
+            self._save_images_to_pdf(images, file_path)
+        return file_path
